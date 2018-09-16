@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+        <script type="text/javascript">
+            function process_submit() {
+                var input = document.getElementById("sign_image").files[0];
+                
+                if (input) {
+                    var reader = new FileReader();
+                    
+                    reader.onload = function (e) {
+                        var image_data = e.target.result;
+                        document.getElementById("image_preview").src = image_data;
+                        document.getElementById("image_preview").style.visibility = "visible";
+                        var image_data_content = image_data.substring(image_data.indexOf(",") + 1);
+                        $.ajax({
+                            url: "https://vision.googleapis.com/v1/images:annotate?key=AIzaSyB-zSgtDZm1cgjJDwI0bKUoxHoR0KjO-pU",
+                            type: "POST",
+                            data: JSON.stringify({
+                                "requests": [
+                                    {
+                                        "image":{
+                                            "content": image_data_content
+                                        },
+                                        "features": [
+                                            {
+                                                "type": "TEXT_DETECTION",
+                                                "maxResults": 10
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }),
+                            contentType: 'application/json',
+                            success: function (result) {
+                                process_response(result);
+                            },
+                            error: function (request, status, error) {
+                                console.log("ERROR: Request: " + JSON.stringify(request) + ", status: " + status);
+                            }
+                        });
+                    };
+                    
+                    reader.readAsDataURL(input);
+                }
+                return false;
+            }
+            
+            function process_response(result) {
+                console.log("response: " + result);
+                if (result.responses.length > 0) {
+                    var sign_text = result.responses[0].fullTextAnnotation.text;
+                    document.getElementById("sign_text").innerHTML = "Sign: " + sign_text;
+                }
+            }
+        </script>
+    </head>
+
+    <body>
+        <form>
+            <fieldset>
+                <legend>Take a picture of the sign</legend>
+                <input type="file" id="sign_image" accept="image/*" capture="environment">
+            </fieldset><br>
+            <p>
+                <input type="submit" value="Submit" onclick="return process_submit()"><br>
+            </p>
+        </form>
+        <p>
+            <img src="" height="200" id="image_preview" alt="Image preview..." style="visibility: hidden;">
+            <div id="sign_text"></div>
+        </p>
+    </body>
+
+</html>
+
