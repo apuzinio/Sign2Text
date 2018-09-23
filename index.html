@@ -2,74 +2,103 @@
 <html>
 
     <head>
+        <!–– We will user jquery-ajax to make our API call -->
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
         <script type="text/javascript">
+            // Step 1: Function called when user clicks on submit button
             function process_submit() {
+                // Get file that user uploaded or created with their camera
                 var input = document.getElementById("sign_image").files[0];
-                
+                // Ensure that user did actually pick a file
                 if (input) {
+                    // Create a file reader
                     var reader = new FileReader();
-                    
-                    reader.onload = function (e) {
-                        var image_data = e.target.result;
-                        document.getElementById("image_preview").src = image_data;
-                        document.getElementById("image_preview").style.visibility = "visible";
-                        var image_data_content = image_data.substring(image_data.indexOf(",") + 1);
-                        $.ajax({
-                            url: "https://vision.googleapis.com/v1/images:annotate?key=AIzaSyB-zSgtDZm1cgjJDwI0bKUoxHoR0KjO-pU",
-                            type: "POST",
-                            data: JSON.stringify({
-                                "requests": [
-                                    {
-                                        "image":{
-                                            "content": image_data_content
-                                        },
-                                        "features": [
-                                            {
-                                                "type": "TEXT_DETECTION",
-                                                "maxResults": 10
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }),
-                            contentType: 'application/json',
-                            success: function (result) {
-                                process_response(result);
-                            },
-                            error: function (request, status, error) {
-                                console.log("ERROR: Request: " + JSON.stringify(request) + ", status: " + status);
-                            }
-                        });
-                    };
-                    
+                    // Specify function to call when file reading is complete (step 2)
+                    reader.onload = finished_reading_file;
+                    // Start reading file...
                     reader.readAsDataURL(input);
                 }
+                // Function should return false so we stay on this web page
                 return false;
             }
             
+            // Step 2: Function called when browser finishes reading the file
+            function finished_reading_file(file_reader) {
+                // get data of the read file. This is of the form "image/jpeg, image data"
+                var image_data = file_reader.target.result;
+                // set source of HTML element "image_preview" to data just read and make it visible
+                document.getElementById("image_preview").src = image_data;
+                document.getElementById("image_preview").style.visibility = "visible";
+                // remove the "image/jpeg" part of the data as the vision API just wants the data part
+                var image_data_content = image_data.substring(image_data.indexOf(",") + 1);
+                // Ajax call for calling vision API
+                $.ajax({
+                    type: "POST", // REST verb is POST
+                    url: "https://vision.googleapis.com/v1/images:annotate?key=AIzaSyB-zSgtDZm1cgjJDwI0bKUoxHoR0KjO-pU", // REST endpoint + API key
+                    // Passing API key from client in this way is not secure but we are going for simplicity with this example
+                    // Here is the JSON we are sending with our request
+                    data: JSON.stringify({
+                        "requests": [
+                            {
+                                "image":{
+                                    "content": image_data_content // here is where we set the image data
+                                },
+                                "features": [
+                                    {
+                                        "type": "TEXT_DETECTION", // tell API to look for text
+                                        "maxResults": 10
+                                    }
+                                ]
+                            }
+                        ]
+                    }),
+                    contentType: 'application/json',
+                    success: function (result) {
+                        process_response(result); // call this function when API returns (step 3)
+                    },
+                    // in case something goes wrong lets show an error in the console
+                    error: function (request, status, error) {
+                        console.log("ERROR: Request: " + JSON.stringify(request) + ", status: " + status);
+                    }
+                });                
+            }
+            
+            // Step 3: Function called when Vision API returns
             function process_response(result) {
-                console.log("response: " + result);
-                if (result.responses.length > 0) {
+                // Write the actual result object in Javascript console so we can inspect it
+                console.log("response:");
+                console.log(result);
+                // If the image is missing text, first element of responses array will not have any text
+                if (result.responses[0].fullTextAnnotation !== undefined) {
+                    // We do have text so lets display it in the HTML element "sign_text"
                     var sign_text = result.responses[0].fullTextAnnotation.text;
                     document.getElementById("sign_text").innerHTML = "Sign: " + sign_text;
+                } else {
+                    // No text was found so lets inform the user
+                    document.getElementById("sign_text").innerHTML = "No text found in sign :(";
                 }
             }
         </script>
     </head>
 
     <body>
+        <!–– form is the HTML tag we use to take input form user -->
         <form>
+            <!–– fieldset is the HTML tag to create a label and input field together -->
             <fieldset>
                 <legend>Take a picture of the sign</legend>
+                <!–– "sign_image" is the ID of the HTML element where user picks image to process -->
                 <input type="file" id="sign_image" accept="image/*" capture="environment">
             </fieldset><br>
             <p>
+                <!–– User will click on submit button to run our Javascript code -->
                 <input type="submit" value="Submit" onclick="return process_submit()"><br>
             </p>
         </form>
         <p>
+            <!–– "image_preview" is the ID of the HTML element where we show user the image they picked -->
             <img src="" height="200" id="image_preview" alt="Image preview..." style="visibility: hidden;">
+            <!–– "sign_text" is the ID of the HTML element where we show result from vision API -->
             <div id="sign_text"></div>
         </p>
     </body>
